@@ -1,6 +1,6 @@
 import type { State, Settings } from "./types";
 
-const KEY = "studora-data-v1";
+
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 export const todayYmd = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 export const parseYmd = (s: string) => { const [y=2000,m=1,d=1] = s.split("-").map(Number); return new Date(y,m-1,d); };
@@ -16,7 +16,7 @@ export const defaultState: State = {
 };
 let state: State = defaultState;
 const listeners = new Set<() => void>();
-let loaded = false;
+
 function normalize(raw: unknown): State {
   if (!raw || typeof raw !== "object") return structuredClone(defaultState);
   const d = raw as Partial<State>;
@@ -29,19 +29,11 @@ function normalize(raw: unknown): State {
     settings:{...defaultSettings,...(d.settings??{}),notif:{...defaultSettings.notif,...(d.settings?.notif??{})}}
   };
 }
-function load() {
-  if (loaded || typeof window==="undefined") return;
-  loaded=true;
-  try { const raw=localStorage.getItem(KEY); if(raw) state=normalize(JSON.parse(raw)); }
-  catch { state=structuredClone(defaultState); }
-}
-export function getState(){load();return state;}
+export function getState(){return state;}
 export function subscribe(listener:()=>void){listeners.add(listener);return()=>listeners.delete(listener);}
+export function replaceState(raw:unknown){state=normalize(raw);listeners.forEach(l=>l());}
 export function update(mutator:(s:State)=>State) {
-  load(); state=mutator(state);
-  try { localStorage.setItem(KEY,JSON.stringify(state)); }
-  catch { window.dispatchEvent(new CustomEvent("studora-storage-full")); }
-  listeners.forEach(l=>l());
+  state=mutator(state);listeners.forEach(l=>l());
 }
 export function patchSettings(p:Partial<Settings>){update(s=>({...s,settings:{...s.settings,...p}}));}
 export function upsert<K extends "classes"|"periods"|"assignments"|"events"|"notes"|"goals"|"reminders">(key:K,item:State[K][number]) {
